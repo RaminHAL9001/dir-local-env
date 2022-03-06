@@ -46,6 +46,13 @@ file in every single project directory. Although the
        (lucky-number 10001)))
   #+END_SRC
 
+- Unlike the ~dir-locals-set-class-variables~ function which requires
+  you declare a "class" symbol first and then apply that class using
+  ~dir-locals-set-directory-class~, with ~defdir-local-env~ each
+  directory gets it's own unique "class" of variables, and updates to
+  these variables apply immediately* wihout effecting other
+  directories (see caveats below).
+
 - Easy to temporarily disable by setting the local
   ~disable-dir-local-env~ variable to non-~nil~.
 
@@ -124,3 +131,19 @@ Again, this is not exactly easy to do at this time, but it is hoped
 that soon functionality to automate the process of extracting computed
 process environments from functional package managers like Nix or
 Guix, or from ~direnv~, will be implemented.
+
+** Caveats
+The ~defdir-local-env~ macro and other commands like
+~dir-local-env-set~ can apply changes to the directory local variables
+immediately. Changes to ~process-environment~ and ~exec-path~ will be
+seen immediately since ~dir-local-env-global-minor-mode~ checks these
+variables on each invocation of ~make-process~.
+
+*However* for all other directory local variables it is still
+necessary to call ~hack-dir-local-variables~ on each buffer affected
+by changes to the directory local environment after making updates to
+other variables. This process might be automated in a later version by
+adding advice functions to ~switch-to-buffer~ that automatically call
+~hack-dir-local-variables~ whenever user focus switches to a
+directory. The architecture for how updates to the dir-local variables
+might be applied has not been fully investigated yet.
