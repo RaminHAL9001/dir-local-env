@@ -1,0 +1,126 @@
+#+TITLE: ~dir-local-env.el~
+#+AUTHOR: Ramin Honary
+#+DATE: <2022-03-06 Sun>
+
+(*Warning:* beta-quality software. Feature complete, but tested only
+by the developer. Feedback is welcome, encouraged.)
+
+This package contains an Emacs Lisp system for configuring directory
+local variables, similar to the ~.dir-locals.el~ mechanism already
+built-in to Emacs. The motivation for this is to simplify the
+declaration of per-project local variables that apply to a directory
+and all files within, but without needing to create a ~.dir-locals.el~
+file in every single project directory. Although the
+~dir-local-env.el~ system may be used in combination with
+~.dir-locals.el~ files as well.
+
+** Features
+- Provides a global minor mode ~dir-local-env-global-minor-mode~
+
+- Can be used to complement the ~.dir-locals.el~ system, rather than
+  replace it.
+
+- sets "advice" on Emacs built-in process execution functions like
+  ~make-process~ so as to alter the ~process-environment~ and
+  ~exec-path~ variables on a per-project basis, especially useful for
+  setting ~M-x compile~ executable on a per-project basis.
+
+- Compatible with Emacs's ~project.el~. When a directory local
+  environment is registered for a directory, the ~project.el~ commands
+  automatically see this directory as a project directory (disable by
+  setting ~project-dir-disabled~ to non-~nil~).
+
+- Configuration syntax similar to the Emacs Lisp ~(let* ...)~ macro,
+  for example:
+
+  #+BEGIN_SRC emacs-lisp
+    (defdir-local-env
+
+      "/home/abcdef/projects/sort-of-cool-raytracer"
+      ((exec-path '("/usr/local/optimized-gpu-thing/compiler", "/usr/bin")))
+
+      "/home/abcdef/projects/really-cool-compiler"
+      ((project-dir-disabled t)
+       ;; ^ this directory is thus ignored by `project.el' commands
+       (favorite-color "red")
+       (lucky-number 10001)))
+  #+END_SRC
+
+- Easy to temporarily disable by setting the local
+  ~disable-dir-local-env~ variable to non-~nil~.
+
+- "Idempotent" declaration semantics, meaning if you evaluate the
+  ~(defdir-local-env ...)~ macro twice by accident, only the first
+  invocation has any effect. To update the configuration, unregister
+  the directory local environment and then re-evaluate the modified
+  ~(defdir-local-env ...)~ macro for that directory.
+
+- Provides Emacs commands to register directory-local environments,
+  and set variables, without using the declarative ~defdir-local-env~
+  macro:
+
+  - ~dir-local-env-register~ registers a directory to have it's own
+    directory-local environment.
+
+  - ~dir-local-env-unregister~ deletes a directory-local environment.
+
+  - ~dir-local-env-set~ sets an environment variable in a registered
+    directory-local environment.
+
+  - ~dir-local-env-show-all~ shows a directory's registered local
+    environment and all variables set for that environment.
+
+** Use Cases
+The ~dir-local-env.el~ system offers features not provided by the
+~.dir-locals.el~ mechanism for a few use cases:
+
+- When you would like to keep your Emacs-specific project directory
+  configurations in a single location, such as your ~init.el~ file.
+
+- When you have a project under revision control (e.g. Git) and do not
+  want to track the ~.dir-locals.el~ in the revision history or share
+  it with others. Note that all modern revision control systems allow
+  you to automatically exclude such files from being tracked, there
+  may be situations where keeping the ~.dir-local.env~ file out of the
+  project directory entirely might be easier for you.
+
+** An Emacs Lisp implementation of [[https://direnv.net][direnv]]
+Features for extracting environment variables from a shell process is
+still *experimental*, and not at all easy to do (yet). But the
+~dlenv--split-null-delimited-string~ function is provided so that you
+might parse the output of the ~printenv -0;~ shell command and produce
+an environment data structure suitable for use with Emacs's
+~process-environment~ variable. Setting this variable in a dir-local
+environment is similar to using [[https://direnv.net][direnv]] in the command line.
+
+This also applies to projects computed by a functional package manager
+such as:
+
+- [[https://nixos.org][Nix]] ~nix-shell~, and
+- [[https://guix.gnu.org][Guix]] ~guix-shell~ programs
+
+This is intended to be helpful when using the Emacs built-in ~M-x
+compile~ command, when one would like to execute a compiler via
+project-specific directory ~PATH~ environment variable defined by
+directory-local environment variable mechanisms such as, ~direnv~. You
+can cache the environment provided by ~direnv~ into Emacs's
+~process-environment~ variable *just* for a particular project
+directory, so that ~M-x compile~ always executes a compiler in the
+~PATH~ provided by ~direnv~.
+
+This can theoretically also be helpful if you choose to install a
+[[https://microsoft.github.io/language-server-protocol/][Language Server Protocol]] (LSP) server using the Nix or Guix package
+managers, and would like to direct the [[https://github.com/joaotavora/eglot][eglot]] or [[https://emacs-lsp.github.io/lsp-mode/][lsp-mode]] systems to
+use a LSP server specific to a particular project directory.
+
+Once the shell environment has been computed and you have a shell, you
+may extract the environment using a command like ~printenv -0;~ and
+cache the result in a directory local ~process-environment~
+variable. From that point on, any time the ~M-x compile~ command is
+called on a file within that directory, the compiler and environment
+variables defined by the Nix/Guix shell environment will be called.
+
+Again, this is not exactly easy to do at this time, but it is hoped
+that soon functionality to automate the process of extracting computed
+process environments from functional package managers like Nix or
+Guix, or from ~direnv~, will be implemented.
