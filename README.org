@@ -5,30 +5,86 @@
 (*Warning:* beta-quality software. Feature complete, but tested only
 by the developer. Feedback is welcome, encouraged.)
 
-This package contains an Emacs Lisp system for configuring directory
-local variables, similar to the ~.dir-locals.el~ mechanism already
-built-in to Emacs. The motivation for this is to simplify the
-declaration of per-project local variables that apply to a directory
-and all files within, but without needing to create a ~.dir-locals.el~
-file in every single project directory. Although the
-~dir-local-env.el~ system may be used in combination with
-~.dir-locals.el~ files as well.
+This package allows you to use the Emacs ~project.el~ system by
+assigning properties to project directories which can be inherited as
+buffer-local variables by all files within the project directory. It
+is similar to the ~.dir-locals.el~ mechanism already built-in to
+Emacs, but with some important differences, which make it more similar
+to the [[https://direnv.net][direnv]] CLI utility than ~.dir-locals.el~.
+
+The key differences are:
+
+1. Any directory registered with ~dir-local-env~ will *automatically
+   be detected as a project directory* by the ~project.el~ system
+   (though you can register directories opting-out of ~project.el~).
+
+2. There is no need to create a ~.dir-locals.el~ file in every single
+   project directory.
+
+3. Unlike the ~dir-locals-class-alist~ variable built-in to Emacs, the
+   ~dir-local-env.el~ mechanism can *assign a unique set of properties
+   directly to each project,* rather than assigning properties on a
+   per-class or per-major-mode basis.
+
+4. Updates to the ~dir-local-env~ for a directory are *applied
+   immediately* (with [[Caveats][some caveats]]), so no need to first update the
+   class variables ~alist~ and then re-assign the class to a
+   directory, every time a property is modified.
+
+The ~dir-locals-class-alist~, which can be set by the
+~dir-locals-set-class-variables~ function, is the mechanism built-in
+to Emacs for assigning directory-local variables to directories that
+cannot store a ~.dir-locals.el~ file. This class-based mechanism can
+set variables for a directory inherited by all files within that
+directory, and can set additional variables depending on the
+major-mode of each file loaded from within that directory. You may
+even assign multiple classes to each directory.
+
+However this class-based mechanism still requires the creation of a
+class, and it requires the additional step of assigning the class to a
+directory. So the directory-local variables mechanism built-in to
+Emacs is not suitable for use cases where:
+
+- you have many project directories, and you need each directory to
+  have it's own unique set of directory-local variables, since you
+  would need to create one unique class for each project directory,
+  populate each class with the correct properties, then assign each
+  class to it's respective directory.
+
+- you need to make changes to the directory-local properties of a
+  project often. This would require creating an additional class for
+  the oft-changed properties, assigning that class to a directory,
+  calling the ~hack-dir-local-variables~ function, and then calling
+  the ~hack-local-variables~ function on each already-open buffer to
+  inherit the updates.
+
+With ~dir-local-env.el~, there are no classes of variables and no
+filters based on major mode, you simply assign variables directly to a
+directory, and all files within that directory inherit those variables
+as buffer-local variables. This prevents the need for hacky solutions
+like generating a unique class name from a directory path.
+
+The ~dir-local-env~ mechanism *complements* (not replaces) the
+~dir-local-env.el~, so directory-local variables may be set by both or
+either. So it is still possible to use the ~dir-locals-class-alist~
+and ~dir-locals-set-class-variables~ function while using
+~dir-local-env.el~.
 
 ** Features
 - Provides a global minor mode ~dir-local-env-global-minor-mode~
 
-- Can be used to complement the ~.dir-locals.el~ system, rather than
-  replace it.
+- Compatible with Emacs's ~project.el~. When a directory local
+  environment is registered for a directory, the ~project.el~ commands
+  automatically see this directory as a project directory (disable by
+  setting ~project-dir-disabled~ to non-~nil~).
 
 - sets "advice" on Emacs built-in process execution functions like
   ~make-process~ so as to alter the ~process-environment~ and
   ~exec-path~ variables on a per-project basis, especially useful for
   setting ~M-x compile~ executable on a per-project basis.
 
-- Compatible with Emacs's ~project.el~. When a directory local
-  environment is registered for a directory, the ~project.el~ commands
-  automatically see this directory as a project directory (disable by
-  setting ~project-dir-disabled~ to non-~nil~).
+- Can be used to complement the ~.dir-locals.el~ system, rather than
+  replace it.
 
 - Configuration syntax similar to the Emacs Lisp ~(let* ...)~ macro,
   for example:
@@ -45,13 +101,6 @@ file in every single project directory. Although the
        (favorite-color "red")
        (lucky-number 10001)))
   #+END_SRC
-
-- Unlike the ~dir-locals-set-class-variables~ function which requires
-  you declare a "class" symbol first and then apply that class using
-  ~dir-locals-set-directory-class~, with ~defdir-local-env~ each
-  directory gets it's own unique "class" of variables, and updates to
-  these variables apply immediately* wihout effecting other
-  directories (see caveats below).
 
 - Easy to temporarily disable by setting the local
   ~disable-dir-local-env~ variable to non-~nil~.
@@ -76,20 +125,6 @@ file in every single project directory. Although the
 
   - ~dir-local-env-show-all~ shows a directory's registered local
     environment and all variables set for that environment.
-
-** Use Cases
-The ~dir-local-env.el~ system offers features not provided by the
-~.dir-locals.el~ mechanism for a few use cases:
-
-- When you would like to keep your Emacs-specific project directory
-  configurations in a single location, such as your ~init.el~ file.
-
-- When you have a project under revision control (e.g. Git) and do not
-  want to track the ~.dir-locals.el~ in the revision history or share
-  it with others. Note that all modern revision control systems allow
-  you to automatically exclude such files from being tracked, there
-  may be situations where keeping the ~.dir-local.env~ file out of the
-  project directory entirely might be easier for you.
 
 ** An Emacs Lisp implementation of [[https://direnv.net][direnv]]
 Features for extracting environment variables from a shell process is
@@ -147,3 +182,20 @@ adding advice functions to ~switch-to-buffer~ that automatically call
 ~hack-dir-local-variables~ whenever user focus switches to a
 directory. The architecture for how updates to the dir-local variables
 might be applied has not been fully investigated yet.
+
+** Prior art
+There are, of course, other Emacs Lisp systems which allow you to
+assign properties to project directories in the manner of [[https://direnv.net][direnv]].
+
+- [[https://gitlab.com/ideasman42/emacs-sidecar-locals][Sidecar Locals]] allows you to declare properties for a directory in a
+  file at the same level as the directory itself, rather than as a
+  file within the directory. You specify a list of paths in the
+  ~sidecar-local-paths-allow~ to files that can be trusted to assign
+  directory-local properties.
+
+- [[https://github.com/astoff/buffer-env][buffer-env]] is essentially an Emacs Lisp implementation of the [[https://direnv.net][direnv]]
+  tool, which loads project properties from a ~.envrc~ file, rather
+  than from a ~.dir-locals.el~ file, and can be used to set properties
+  such as ~process-environment~ and ~exec-path~, which is very useful
+  for changing the compiler tool chain you are using for a particular
+  project.
