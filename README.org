@@ -187,7 +187,7 @@ might be applied has not been fully investigated yet.
 There are, of course, other Emacs Lisp systems which allow you to
 assign properties to project directories in the manner of [[https://direnv.net][direnv]].
 
-- [[https://gitlab.com/ideasman42/emacs-sidecar-locals][Sidecar Locals]] allows you to declare properties for a directory in a
+- [[https://codeberg.org/ideasman42/emacs-sidecar-locals][Sidecar Locals]] allows you to declare properties for a directory in a
   file at the same level as the directory itself, rather than as a
   file within the directory. You specify a list of paths in the
   ~sidecar-local-paths-allow~ to files that can be trusted to assign
